@@ -13,7 +13,6 @@
  */
 /*
  * Abdallah Mohamed Okasha 20110230 G3
- * Eslam WallyEldeen Mohamed 20110490 G1
  */
 #include <bits/stdc++.h>
 using namespace std;
@@ -22,7 +21,10 @@ string path;
 int listHead;
 int choice, method, numberOfrecords, searchSteps;
 vector<vector<pair<string, int> > > table1(101, vector<pair<string, int> >(3));
-vector<vector<pair<string, int> > > table2(101, vector<pair<string, int> >(3));
+vector<vector<pair<string, int> > > table2(101, vector<pair<string, int> >(2));
+//Scatter Table (method#3)
+//vector<pair<value, next> >
+vector<int> ndx(101, -1);
 struct Book {
 public:
 	char ISBN[30]; // unique, like the ID for a student
@@ -32,7 +34,12 @@ public:
 	char publisher[50];
 	short pages;
 };
-
+struct ScatterTable {
+	string pk;
+	int offset;
+	int next;
+};
+vector<ScatterTable> table3(101);
 const int maxBufferSize = 2000;
 /* Hashing Functions */
 void insert_m1(char ISBN[], int offset);
@@ -519,6 +526,9 @@ void compactFile() {
 
 int main() {
 	choice = 0;
+	//initialize table3
+	for (int i = 0; i < 101; ++i)
+		table3[i].next = -1;
 	while (choice != 9) {
 		cout << "Enter your Choice: \n";
 		cout << "1- add new book\n";
@@ -704,23 +714,226 @@ void search_m1(char ISBN[], int offset) {
 }
 //======
 void insert_m2(char ISBN[], int offset) {
+	int flag = 0;
+	string isbn(ISBN);
+	int hashValue1 = (int(ISBN[0]) * int(ISBN[1])) % 101;
+	int hashValue2 = (int(ISBN[2]) * int(ISBN[3])) % 23;
 
+	for (int i = 0; i < 99; ++i) {
+		vector<pair<string, int> > tmp = table2[hashValue1];
+		if (tmp[0].first != "" && tmp[1].first != "") {
+			hashValue1 += hashValue2;
+			hashValue1 %= 101;
+		} else if (tmp[0].first == "") {
+			tmp[0].first = isbn;
+			tmp[0].second = offset;
+			table2[hashValue1] = tmp;
+			flag = 1;
+		}
+		if (flag)
+			break;
+		else if (tmp[1].first == "") {
+			tmp[1].first = isbn;
+			tmp[1].second = offset;
+			table2[hashValue1] = tmp;
+			flag = 1;
+		}
+		if (flag)
+			break;
+	}
+	if (!flag)
+		cout << "Method2: Can't Insert this Record to hash table2\n";
+	if (flag)
+		cout << "Method2: Record Successfully Inserted in hash table2\n";
 }
 void delete_m2(char ISBN[], int offset) {
+	int flag = 0;
+	string isbn(ISBN);
+	int hashValue1 = (int(ISBN[0]) * int(ISBN[1])) % 101;
+	int hashValue2 = (int(ISBN[2]) * int(ISBN[3])) % 23;
 
+	for (int i = 0; i < 99; ++i) {
+		vector<pair<string, int> > tmp = table2[hashValue1];
+		if (tmp[0].first != isbn && tmp[1].first != isbn) {
+			hashValue1 += hashValue2;
+			hashValue1 %= 101;
+		} else if (tmp[0].first == isbn) {
+			tmp[0].first = "######";
+			tmp[0].second = -1;
+			table2[hashValue1] = tmp;
+			flag = 1;
+		}
+		if (flag)
+			break;
+		else if (tmp[1].first == isbn) {
+			tmp[1].first = "######";
+			tmp[1].second = -1;
+			table2[hashValue1] = tmp;
+			flag = 1;
+		}
+		if (flag)
+			break;
+	}
+	if (!flag)
+		cout << "Method2: Can't find this Record in hash table2\n";
+	if (flag)
+		cout << "Method2: record Deleted Successfully\n";
 }
 void search_m2(char ISBN[], int offset) {
+	int flag = 0;
+	string isbn(ISBN);
+	int hashValue1 = (int(ISBN[0]) * int(ISBN[1])) % 101;
+	int hashValue2 = (int(ISBN[2]) * int(ISBN[3])) % 23;
+	int searchSteps = 0;
+	for (int i = 0; i < 99; ++i) {
+		++searchSteps;
+		vector<pair<string, int> > tmp = table2[hashValue1];
+		if (tmp[0].first != isbn && tmp[1].first != isbn) {
+			hashValue1 += hashValue2;
+			hashValue1 %= 101;
+		} else if (tmp[0].first == isbn)
+			flag = 1;
+		if (flag)
+			break;
+		else if (tmp[1].first == isbn)
+			flag = 1;
 
+		if (flag)
+			break;
+	}
+	if (!flag)
+		cout << "Method2: Can't find this Record in hash table2\n";
+	if (flag)
+		cout << "Method2: record Deleted Successfully\n" << "Search Steps: "
+				<< searchSteps - 1 << "\n";
 }
 //=======
 void insert_m3(char ISBN[], int offset) {
+	string isbn(ISBN);
+	int hashValue = (int(ISBN[0]) * int(ISBN[1])) % 101, next, flag = 0;
+	if (ndx[hashValue] == -1) {
+		for (int i = 0; i < 101; ++i) {
 
+			if (table3[i].next == -1
+					&& (table3[i].pk == "" || table3[i].pk == "######")) {
+				next = i;
+				break;
+			}
+		}
+		ndx[hashValue] = next;
+		table3[next].pk = isbn;
+		table3[next].offset = offset;
+		flag = 1;
+	} else if (ndx[hashValue != -1] && !flag) {
+		next = ndx[hashValue];
+		while (1) {
+			if (table3[next].next == -1) {
+				for (int i = next; i < 101; ++i) {
+					if (table3[i].pk == "" && table3[i].next == -1) {
+						table3[next].next = i;
+						table3[i].pk = isbn;
+						table3[i].offset = offset;
+						flag = 1;
+						break;
+					}
+				}
+
+			}
+			if (flag)
+				break;
+			next = table3[next].next;
+		}
+	}
+	if (flag)
+		cout << "Method3: Record Successfully inserted\n";
+	else if (!flag)
+		cout << "Method3: can't in insert record in table3\n";
 }
 void delete_m3(char ISBN[], int offset) {
+	string isbn(ISBN);
+	int hashValue = (int(ISBN[0]) * int(ISBN[1])) % 101, next, flag = 0;
+	if (ndx[hashValue] == -1) {
+		for (int i = 0; i < 101; ++i) {
 
+			if (table3[i].next == -1 && table3[i].pk == "") {
+				next = i;
+				break;
+			}
+		}
+		ndx[hashValue] = next;
+		table3[next].pk = isbn;
+		table3[next].offset = offset;
+		flag = next;
+	} else if (ndx[hashValue != -1] && !flag) {
+		next = ndx[hashValue];
+		while (1) {
+			if (table3[next].next == -1) {
+				for (int i = next; i < 101; ++i) {
+					if (table3[i].pk == "" && table3[i].next == -1) {
+						table3[next].next = i;
+						table3[i].pk = isbn;
+						table3[i].offset = offset;
+						flag = next;
+						break;
+					}
+				}
+
+			}
+			if (flag)
+				break;
+			next = table3[next].next;
+		}
+	}
+	if (flag) {
+		if (table3[flag].pk == "######")
+			cout << "Method3: Record already deleted!! \n";
+		else {
+			table3[flag].pk = "######";
+			cout << "Method3: Record Successfully deleted\n";
+		}
+	} else if (!flag)
+		cout << "Method3: can't in find record in table3\n";
 }
 void search_m3(char ISBN[], int offset) {
+	string isbn(ISBN);
+	int hashValue = (int(ISBN[0]) * int(ISBN[1])) % 101, next, flag = 0;
+	if (ndx[hashValue] == -1) {
+		for (int i = 0; i < 101; ++i) {
 
+			if (table3[i].next == -1 && table3[i].pk == "") {
+				next = i;
+				break;
+			}
+		}
+		ndx[hashValue] = next;
+		table3[next].pk = isbn;
+		table3[next].offset = offset;
+		flag = next;
+	} else if (ndx[hashValue != -1] && !flag) {
+		next = ndx[hashValue];
+		while (1) {
+			if (table3[next].next == -1) {
+				for (int i = next; i < 101; ++i) {
+					if (table3[i].pk == "" && table3[i].next == -1) {
+						table3[next].next = i;
+						table3[i].pk = isbn;
+						table3[i].offset = offset;
+						flag = next;
+						break;
+					}
+				}
+
+			}
+			if (flag)
+				break;
+			next = table3[next].next;
+		}
+	}
+	if (flag)
+		cout << "Method3: record found " << table3[flag].pk << " "
+				<< table3[flag].offset << "\n";
+	else
+		cout << "Method3: record not found\n";
 }
 
 void constructTable1() {
@@ -800,10 +1013,79 @@ void readTable1() {
 }
 
 void constructTable2() {
+	Book b;
+	fstream f;
+	int len, head, offset;
 
+	f.open("book.txt", ios::in | ios::binary | ios::out);
+	f.seekg(0, ios::beg);
+	f.read((char*) &head, sizeof(head));
+	cout << head << "\n";
+	f.seekg(f.tellg() + 1, ios::beg);
+	while (!f.eof()) {
+		offset = f.tellg();
+		f.read((char*) &len, sizeof(len));
+		cout << len << "\n";
+
+		char *buf = new char[len];
+		f.read(buf, len);
+
+		istringstream strbuf(buf);
+		strbuf.getline(b.ISBN, 30, '|');
+		strbuf.getline(b.Title, 50, '|');
+		strbuf.getline(b.Author, 50, '|');
+		insert_m2(b.ISBN, offset);
+	}
+	f.close();
 }
 
 void printTable2() {
+	for (int i = 0; i < 101; ++i) {
+		vector<pair<string, int> > tmp = table2[i];
+		for (int j = 0; j < 2; ++j)
+			cout << "(" << tmp[j].first << ", " << tmp[j].second << ")     ";
+		cout << "\n";
+	}
+}
+void writeTable2() {
+	fstream f;
+	f.open("table2.txt", ios::out | ios::binary | ios::in | ios::app);
+	for (int i = 0; i < 101; ++i) {
+		vector<pair<string, int> > tmp = table2[i];
+		for (int j = 0; j < 2; ++j) {
+			char buffer[maxBufferSize];
+			string pk = tmp[j].first;
+			strcpy(buffer, pk.c_str());
+			strcat(buffer, "|");
 
+			char off[50];
+			sprintf(off, "%d", tmp[j].second);
+			strcat(buffer, off);
+			int len = strlen(buffer);
+			f.write((char*) &len, sizeof(len));
+			f.write(buffer, len);
+		}
+	}
+	f.close();
+}
+void readTable2() {
+	int len;
+	fstream f;
+	f.open("table2.txt", ios::in | ios::binary | ios::out);
+	while (!f.eof()) {
+		f.read((char*) &len, sizeof(len));
+		cout << len << "\n";
+		char *buf = new char[len];
+		f.read(buf, len);
+
+		istringstream strbuf(buf);
+		char pk[30];
+		char off[50];
+		strbuf.getline(pk, 30, '|');
+		strbuf.getline(off, 50, '|');
+		int offset = atoi(off);
+		insert_m2(pk, offset);
+	}
+	f.close();
 }
 
